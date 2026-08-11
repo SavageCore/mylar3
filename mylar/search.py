@@ -1466,8 +1466,8 @@ def verification(verified_matches, is_info):
                     )
                 notify_snatch(
                     sent_to,
-                    verified_matches[verified_index]['entry']['series'], #is_info['ComicName'],
-                    verified_matches[verified_index]['entry']['year'], #is_info['ComicYear'],
+                    is_info['ComicName'],
+                    is_info['ComicYear'],
                     verified_matches[verified_index]['pack_numbers'],
                     verified_matches[verified_index]['nzbprov'],
                     True,
