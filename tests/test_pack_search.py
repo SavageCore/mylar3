@@ -147,3 +147,52 @@ def test_ddlrss_pack_detect_preacher_family():
         assert result is not None, t
         assert result['pack'] is True, t
         assert result['issues'] == exp, (t, result['issues'])
+
+
+def test_whole_series_pack_detect_franchise_spinoff():
+    """A franchise pack like 'Preacher (001-066 + Books 01-06 + Specials)'
+    should match when searching a spin-off series (e.g. 'Preacher Special:
+    Saint of Killers') via the root series name."""
+    from mylar import search_filer
+
+    sf = search_filer.search_check()
+
+    class FakeDB(object):
+        def __init__(self):
+            self.data = [
+                {'Int_IssueNumber': 1000},
+                {'Int_IssueNumber': 2000},
+                {'Int_IssueNumber': 3000},
+                {'Int_IssueNumber': 4000},
+            ]
+
+        def select(self, query, args):
+            assert 'Wanted' in query
+            return self.data
+
+    import mylar
+    mylar.db.DBConnection = lambda: FakeDB()
+
+    result = sf._whole_series_pack_detect(
+        'Preacher (001-066 + Books 01-06 + Specials) (1995-2014)',
+        'Preacher Special: Saint of Killers',
+        '1996',
+        '5757',
+    )
+    assert result is not None
+    assert result['issues'] == '1-4'
+    assert result['title'] == 'Preacher (1996)'
+
+
+def test_gen_altnames_franchise_root_fallback(monkeypatch):
+    """Spin-off series searches should add the root series name as a fallback
+    search so franchise packs surface."""
+    import mylar
+    from mylar import search
+
+    searchlist = search.gen_altnames(
+        'Preacher Special: Saint of Killers', None, None, None
+    )
+    names = [x['ComicName'] for x in searchlist]
+    assert 'Preacher Special: Saint of Killers' in names
+    assert 'Preacher' in names

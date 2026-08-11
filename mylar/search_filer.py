@@ -34,14 +34,28 @@ class search_check(object):
 
         Results like "Watchmen (1986)" carry no explicit issue range in the
         title, but when AllowPacks is enabled a bare series-name result is a
-        full-series pack covering every wanted issue. Returns a dict with the
+        full-series pack covering every wanted issue. Franchise packs (e.g.
+        "Preacher (001-066 + Books 01-06 + Specials)") match against the root
+        series name of a spin-off being searched. Returns a dict with the
         cleaned title and a "1-N" range string, or None if the title is not a
-        bare series match.
+        match.
         """
         base = re.sub(r'[\s_.\-]+', ' ', title).strip()
         base = re.sub(r'\(\d{4}(?:-\d{4})?\)', '', base).strip()
         base = re.sub(r'^\d{4}$', '', base).strip()
-        if base.lower() != re.sub(r'[\s_.\-]+', ' ', ComicName).lower().strip():
+        norm_name = re.sub(r'[\s_.\-]+', ' ', ComicName).strip()
+        # franchise root for spin-offs (e.g. "Preacher Special: Saint of Killers" -> "Preacher")
+        root_name = re.split(
+            r'\s+special\b|\s+annual\b|\s*[:]', norm_name, flags=re.I
+        )[0].strip()
+        matches = (
+            base.lower() == norm_name.lower()
+            or (
+                root_name and root_name.lower() != norm_name.lower()
+                and base.lower().startswith(root_name.lower())
+            )
+        )
+        if not matches:
             return None
         try:
             myDB = db.DBConnection()
@@ -56,7 +70,11 @@ class search_check(object):
         )
         if not nums:
             return None
-        return {'title': title, 'issues': '%s-%s' % (nums[0], nums[-1])}
+        # return a clean pack title (series name + year) so downstream parsing
+        # matches the series; the raw entry title may carry franchise clutter
+        # like "Preacher (001-066 + Books 01-06 + Specials)".
+        clean_title = '%s (%s)' % (root_name or norm_name, ComicYear)
+        return {'title': clean_title, 'issues': '%s-%s' % (nums[0], nums[-1])}
 
     def _process_entry(self, entry, is_info):
         if is_info:

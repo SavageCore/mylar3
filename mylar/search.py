@@ -4264,6 +4264,31 @@ def gen_altnames(ComicName, AlternateSearch, filesafe, smode):
         searchlist.append({'ComicName':ComicName,
                            'unaltered_ComicName': ComicName})
 
+    # franchise/spin-off fallback: a series like "Preacher Special: Saint of
+    # Killers" often only surfaces via pack releases titled with the root
+    # series name (e.g. "Preacher (001-066 + Books 01-06 + Specials)"). Add
+    # the root series name as an additional search so those packs can be found.
+    root_name = None
+    if any([
+        'special' in ComicName.lower(),
+        'annual' in ComicName.lower(),
+        ':' in ComicName,
+    ]):
+        root_name = re.split(r'\s+special\b|\s+annual\b|\s*[:]', ComicName, flags=re.I)[0].strip()
+        if root_name.lower() == ComicName.lower() or not root_name:
+            root_name = None
+        elif root_name.lower() in [x['ComicName'].lower() for x in searchlist]:
+            root_name = None
+        elif root_name.lower() == helpers.filesafe(ComicName).lower():
+            root_name = None
+    if root_name:
+        logger.info(
+            '[SEARCH] Franchise spin-off detected. Adding root series fallback: %s'
+            % root_name
+        )
+        searchlist.append({'ComicName': root_name,
+                           'unaltered_ComicName': root_name})
+
     if AlternateSearch is not None and AlternateSearch != "None":
         #chkthealt = list(filter(None, re.split("[[\#\#]|[\!\!]]+", AlternateSearch)))
         chkthealt = list(filter(None, re.split(r"[\!\!]+|[\#\#]+", AlternateSearch)))
