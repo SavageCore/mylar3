@@ -205,4 +205,8 @@ def test_gen_altnames_franchise_root_fallback(monkeypatch):
     )
     names = [x['ComicName'] for x in searchlist]
     assert 'Preacher Special: Saint of Killers' in names
-    assert 'Preacher' in names
+    # the franchise fallback keeps the spin-off name for matching but carries
+    # the root series name as the query string
+    fallback = [x for x in searchlist if x.get('query_name') == 'Preacher']
+    assert len(fallback) == 1
+    assert fallback[0]['ComicName'] == 'Preacher Special: Saint of Killers'

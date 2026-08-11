@@ -431,6 +431,7 @@ def search_init(
                         if all([findit['status'] is False, not provider_blocked]):
                             scarios['ComicName'] = xx['ComicName']
                             scarios['unaltered_ComicName'] = xx['unaltered_ComicName']
+                            scarios['query_name'] = xx.get('query_name')
                             findit = search_the_matrix(scarios)
                             if findit['status'] is True:
                                 logger.fdebug("findit = found!")
@@ -444,6 +445,7 @@ def search_init(
                         if all([findit['status'] is False, not provider_blocked]):
                             scarios['ComicName'] = xx['ComicName']
                             scarios['unaltered_ComicName'] = xx['unaltered_ComicName']
+                            scarios['query_name'] = xx.get('query_name')
                             findit = search_the_matrix(scarios)
                             logger.info('findit: %s' % (findit,))
                             if findit['status'] is True:
@@ -711,7 +713,8 @@ def NZB_SEARCH(
     booktype=None,
     chktpb=0,
     ignore_booktype=False,
-    smode=None
+    smode=None,
+    query_name=None
 ):
 
     allow_packs = bool(allow_packs) and mylar.CONFIG.ENABLE_TORRENT_SEARCH
@@ -798,7 +801,9 @@ def NZB_SEARCH(
     comsearch = []
     isssearch = []
     comyear = str(ComicYear)
-    findcomic = ComicName
+    # use the franchise root as the query string for a spin-off fallback,
+    # while ComicName stays the spin-off for matching purposes.
+    findcomic = query_name if query_name else ComicName
 
     cm1 = re.sub(r'[\/\-]', ' ', findcomic)
     # remove 'and' & '&' from the search pattern entirely
@@ -4192,6 +4197,7 @@ def search_the_matrix(scarios):
                 ignore_booktype=scarios['ignore_booktype'],
                 smode=scarios['smode'],
                 allow_packs=scarios['allow_packs'],
+                query_name=scarios.get('query_name'),
     )
 
 def gen_altnames(ComicName, AlternateSearch, filesafe, smode):
@@ -4286,8 +4292,9 @@ def gen_altnames(ComicName, AlternateSearch, filesafe, smode):
             '[SEARCH] Franchise spin-off detected. Adding root series fallback: %s'
             % root_name
         )
-        searchlist.append({'ComicName': root_name,
-                           'unaltered_ComicName': root_name})
+        searchlist.append({'ComicName': ComicName,
+                           'unaltered_ComicName': ComicName,
+                           'query_name': root_name})
 
     if AlternateSearch is not None and AlternateSearch != "None":
         #chkthealt = list(filter(None, re.split("[[\#\#]|[\!\!]]+", AlternateSearch)))
