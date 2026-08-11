@@ -156,6 +156,16 @@ class search_check(object):
                 pack_issue_range = packchk['issues']
 
         alt_match = False
+        # for a franchise pack matched against a spin-off, the pack title uses
+        # the root series name (e.g. "Preacher (001-066...)" for "Preacher
+        # Special: Saint of Killers"), so parse & match against the root.
+        pack_match_name = ComicName
+        if pack is True:
+            root_name = re.split(
+                r'\s+special\b|\s+annual\b|\s*[:]', ComicName, flags=re.I
+            )[0].strip()
+            if root_name and root_name.lower() != ComicName.lower():
+                pack_match_name = root_name
         #logger.fdebug('entry: %s' % (entry,))
 
         logger.fdebug("checking search result: %s" % entry['title'])
@@ -555,7 +565,7 @@ class search_check(object):
             stripped_title = re.sub(r'\(\d{4}(?:-\d{4})?\)', '', pack_title).strip()
             stripped_title = re.sub(r'#\s*$', '', stripped_title).strip()
             pack_series = filechecker.FileChecker(
-                file=stripped_title, watchcomic=ComicName
+                file=stripped_title, watchcomic=pack_match_name
             ).listFiles()
             dnr = ffc.dynamic_replace(pack_series['series_name'])
             parsed_comic = {'booktype': 'issue',
@@ -603,7 +613,8 @@ class search_check(object):
             or re.sub('None', 'issue', str(booktype)) in parsed_comic['booktype']
         ):
             try:
-                fcomic = filechecker.FileChecker(watchcomic=ComicName)
+                match_watchcomic = pack_match_name if pack is True else ComicName
+                fcomic = filechecker.FileChecker(watchcomic=match_watchcomic)
                 filecomic = fcomic.matchIT(parsed_comic)
             except Exception as e:
                 logger.error('[PARSE-ERROR]: %s' % e)
