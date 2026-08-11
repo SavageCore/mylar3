@@ -381,6 +381,7 @@ def search_init(
                 logger.info('tmp_cmloopit: %s [Issue #:%s]' % (tmp_cmloopit, tmp_IssueNumber))
 
                 scarios = {'tmp_IssueNumber': tmp_IssueNumber,
+                           'allow_packs': allow_packs,
                            'ComicYear': ComicYear,
                            'SeriesYear': SeriesYear,
                            'Publisher': Publisher,
@@ -703,12 +704,7 @@ def NZB_SEARCH(
     smode=None
 ):
 
-    if any([allow_packs == 1, allow_packs == '1']) and all(
-        [mylar.CONFIG.ENABLE_TORRENT_SEARCH, mylar.CONFIG.ENABLE_32P]
-    ):
-        allow_packs = True
-    else:
-        allow_packs = False
+    allow_packs = bool(allow_packs) and mylar.CONFIG.ENABLE_TORRENT_SEARCH
     newznab_local = False
     untouched_name = None
     provider_stat = nzbprov
@@ -870,6 +866,7 @@ def NZB_SEARCH(
                'chktpb': chktpb,
                'smode': smode,
                'provider_stat': provider_stat,
+               'allow_packs': allow_packs,
                'foundc': foundc}
 
     # origcmloopit = cmloopit
@@ -2185,6 +2182,7 @@ def searchforissue(issueid=None, new=False, rsschecker=None, manual=False):
                                        'chktpb': chktpb,
                                        'smode': xr['searchmode'],
                                        'provider_stat': provider_stat,
+                                       'allow_packs': bool(xr['AllowPacks']),
                                        'foundc': foundc}
 
 
@@ -4179,6 +4177,7 @@ def search_the_matrix(scarios):
                 chktpb=scarios['chktpb'],
                 ignore_booktype=scarios['ignore_booktype'],
                 smode=scarios['smode'],
+                allow_packs=scarios['allow_packs'],
     )
 
 def gen_altnames(ComicName, AlternateSearch, filesafe, smode):

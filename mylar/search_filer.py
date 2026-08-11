@@ -21,7 +21,7 @@ import time
 from wsgiref.handlers import format_date_time
 
 import mylar
-from mylar import logger, filechecker, helpers, search
+from mylar import logger, filechecker, helpers, search, rsscheck
 
 
 class search_check(object):
@@ -59,11 +59,31 @@ class search_check(object):
             intIss = is_info['intIss']
             chktpb = is_info['chktpb']
             provider_stat = is_info['provider_stat']
+            allow_packs = is_info.get('allow_packs', False)
 
         try:
             pack = entry['pack']
         except Exception:
             pack = False
+
+        pack_title = None
+        pack_issue_range = None
+        if pack is True:
+            pack_issue_range = entry.get('issues')
+        elif all(
+            [
+                allow_packs is True,
+                'DDL' not in nzbprov,
+                IssueNumber is not None,
+                ComicID is not None,
+            ]
+        ):
+            # trailing space so a range at the very end of the title still parses
+            packchk = rsscheck.ddlrss_pack_detect(entry['title'] + ' ', entry['link'])
+            if packchk is not None:
+                pack = True
+                pack_title = packchk['title']
+                pack_issue_range = packchk['issues']
 
         alt_match = False
         #logger.fdebug('entry: %s' % (entry,))
@@ -431,8 +451,8 @@ class search_check(object):
                 'removed extra information after issue # that'
                 ' is not necessary: %s' % cleantitle
             )
-        # only send it to parser if it's not a DDL + pack (already parsed)
-        if pack is True and 'DDL' in entry['site']:
+        # only send it to parser if it's not a pack (already parsed / needs custom parsing)
+        if pack is True and 'DDL' in entry.get('site', ''):
             logger.fdebug('parsing pack...')
             ffc = filechecker.FileChecker()
             dnr = ffc.dynamic_replace(entry['series'])
@@ -454,6 +474,37 @@ class search_check(object):
                             'comiclocation': None,
                             'parse_status': 'success'}
 
+        elif pack is True:
+            # torznab/newznab/RSS pack (e.g. "Transmetropolitan #1-60 (1997-2002)").
+            # The issue range is already stripped out of pack_title by
+            # ddlrss_pack_detect, but a year *range* in parens breaks series-name
+            # parsing (FileChecker only recognizes a single 4-digit year), so strip
+            # that too before handing the title to the normal parser.
+            logger.fdebug('parsing pack...')
+            ffc = filechecker.FileChecker()
+            stripped_title = re.sub(r'\(\d{4}(?:-\d{4})?\)', '', pack_title).strip()
+            stripped_title = re.sub(r'#\s*$', '', stripped_title).strip()
+            pack_series = filechecker.FileChecker(
+                file=stripped_title, watchcomic=ComicName
+            ).listFiles()
+            dnr = ffc.dynamic_replace(pack_series['series_name'])
+            parsed_comic = {'booktype': 'issue',
+                            'comicfilename': ComicTitle,
+                            'series_name': pack_series['series_name'],
+                            'series_name_decoded': pack_series['series_name'],
+                            'issueid': None,
+                            'dynamic_name': dnr['mod_seriesname'],
+                            'issues': pack_issue_range,
+                            'series_volume': None,
+                            'alt_series': None,
+                            'alt_issue': None,
+                            'issue_year': pack_series['issue_year'],
+                            'issue_number': None,
+                            'scangroup': None,
+                            'reading_order': None,
+                            'sub': None,
+                            'comiclocation': None,
+                            'parse_status': 'success'}
 
         # send it to the parser here.
         else:
@@ -812,20 +863,34 @@ class search_check(object):
 
         downloadit = False
 
-        if all(['DDL' in nzbprov, pack is True]):
+        if pack is True:
             logger.fdebug(
                 '[PACK-QUEUE] %s Pack detected for %s.'
-                % (nzbprov, entry['filename'])
+                % (nzbprov, entry.get('filename', entry['title']))
             )
+
+            # figure out the id to snatch/track this pack under, same as the
+            # non-pack path below, before we use it as the pack_id.
+            if 'DDL' in nzbprov:
+                if 'getcomics' in entry['link']:
+                    nzbid = entry['id']
+            else:
+                try:
+                    if 'details' in entry['id']:
+                        nzbid = search.generate_id(provider_stat, entry['id'], ComicName)
+                    else:
+                        nzbid = search.generate_id(provider_stat, entry['link'], ComicName)
+                except Exception:
+                    nzbid = search.generate_id(provider_stat, entry['link'], ComicName)
 
             # find the pack range.
             pack_issuelist = None
             issueid_info = None
             try:
                 if not entry['title'].startswith('0-Day Comics Pack'):
-                    pack_issuelist = entry['issues']
+                    pack_issuelist = pack_issue_range
                     issueid_info = helpers.issue_find_ids(
-                        ComicName, ComicID, pack_issuelist, IssueNumber, entry['id']
+                        ComicName, ComicID, pack_issuelist, IssueNumber, nzbid
                     )
                     if issueid_info['valid'] is True:
                         logger.info(
@@ -846,11 +911,6 @@ class search_check(object):
                 return None
             # pack support.
             nowrite = False
-            if 'DDL' in nzbprov:
-                if 'getcomics' in entry['link']:
-                    nzbid = entry['id']
-            else:
-                nzbid = search.generate_id(provider_stat, entry['link'], ComicName)
             if all([manual is not True, alt_match is False]):
                 downloadit = True
             else:
@@ -1142,6 +1202,13 @@ class search_check(object):
             if maybe_value is not None:
                 mylar.COMICINFO.append(maybe_value)
                 hold_the_matches.append(maybe_value)
+
+        # verification() snatches the first result with downloadit=True, so the
+        # ordering here decides pack-vs-single preference (PACK_PRIORITY config).
+        hold_the_matches.sort(
+            key=lambda x: x['pack'], reverse=bool(mylar.CONFIG.PACK_PRIORITY)
+        )
+        mylar.COMICINFO = hold_the_matches
 
         #logger.fdebug('returning hold_the_matches: %s' % (hold_the_matches,))
         return hold_the_matches
