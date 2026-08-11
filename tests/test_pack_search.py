@@ -183,6 +183,16 @@ def test_whole_series_pack_detect_franchise_spinoff():
     assert result['issues'] == '1-4'
     assert result['title'] == 'Preacher (1996)'
 
+    # a bare main-series pack must NOT match a spin-off search (it lacks the
+    # specials/extras content)
+    result = sf._whole_series_pack_detect(
+        'Preacher 01-66 (complete, noAds) (theProletariat-DCP)',
+        'Preacher Special: Saint of Killers',
+        '1996',
+        '5757',
+    )
+    assert result is None
+
 
 def test_gen_altnames_franchise_root_fallback(monkeypatch):
     """Spin-off series searches should add the root series name as a fallback

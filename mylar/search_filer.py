@@ -48,14 +48,19 @@ class search_check(object):
         root_name = re.split(
             r'\s+special\b|\s+annual\b|\s*[:]', norm_name, flags=re.I
         )[0].strip()
-        matches = (
-            base.lower() == norm_name.lower()
-            or (
-                root_name and root_name.lower() != norm_name.lower()
-                and base.lower().startswith(root_name.lower())
-            )
-        )
-        if not matches:
+        is_spinoff = bool(root_name) and root_name.lower() != norm_name.lower()
+        if is_spinoff:
+            # searching a spin-off: only accept a franchise pack that actually
+            # signals it contains the extras (specials/books/annuals), not a
+            # bare main-series collection like "Preacher 01-66 (complete)".
+            if not base.lower().startswith(root_name.lower()):
+                return None
+            if not re.search(
+                r'\b(special|extras?|annuals?|books?|one[- ]shots?)\b|\+|omnibus|complete collection',
+                base.lower(),
+            ):
+                return None
+        elif base.lower() != norm_name.lower():
             return None
         try:
             myDB = db.DBConnection()
