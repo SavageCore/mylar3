@@ -21,13 +21,42 @@ import time
 from wsgiref.handlers import format_date_time
 
 import mylar
-from mylar import logger, filechecker, helpers, search, rsscheck
+from mylar import logger, filechecker, helpers, search, rsscheck, db
 
 
 class search_check(object):
 
     def __init__(self):
         pass
+
+    def _whole_series_pack_detect(self, title, ComicName, ComicYear, ComicID):
+        """Detect a whole-series pack in the name-only pack pass.
+
+        Results like "Watchmen (1986)" carry no explicit issue range in the
+        title, but when AllowPacks is enabled a bare series-name result is a
+        full-series pack covering every wanted issue. Returns a dict with the
+        cleaned title and a "1-N" range string, or None if the title is not a
+        bare series match.
+        """
+        base = re.sub(r'[\s_.\-]+', ' ', title).strip()
+        base = re.sub(r'\(\d{4}(?:-\d{4})?\)', '', base).strip()
+        base = re.sub(r'^\d{4}$', '', base).strip()
+        if base.lower() != re.sub(r'[\s_.\-]+', ' ', ComicName).lower().strip():
+            return None
+        try:
+            myDB = db.DBConnection()
+            wanted = myDB.select(
+                "SELECT Int_IssueNumber FROM issues WHERE ComicID=? AND Status='Wanted'",
+                [ComicID],
+            )
+        except Exception:
+            return None
+        nums = sorted(
+            set(int(r['Int_IssueNumber'] // 1000) for r in wanted if r['Int_IssueNumber'])
+        )
+        if not nums:
+            return None
+        return {'title': title, 'issues': '%s-%s' % (nums[0], nums[-1])}
 
     def _process_entry(self, entry, is_info):
         if is_info:
@@ -80,6 +109,24 @@ class search_check(object):
         ):
             # trailing space so a range at the very end of the title still parses
             packchk = rsscheck.ddlrss_pack_detect(entry['title'] + ' ', entry['link'])
+            if packchk is not None:
+                pack = True
+                pack_title = packchk['title']
+                pack_issue_range = packchk['issues']
+        elif all(
+            [
+                allow_packs is True,
+                'DDL' not in nzbprov,
+                IssueNumber is None,
+                ComicID is not None,
+            ]
+        ):
+            # name-only pack pass: a result titled just the series name
+            # (optionally with the year, e.g. "Watchmen (1986)") is treated
+            # as a whole-series pack covering every wanted issue.
+            packchk = self._whole_series_pack_detect(
+                entry['title'], ComicName, ComicYear, ComicID
+            )
             if packchk is not None:
                 pack = True
                 pack_title = packchk['title']

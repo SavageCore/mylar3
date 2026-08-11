@@ -2236,7 +2236,7 @@ def issue_find_ids(ComicName, ComicID, pack, IssueNumber, pack_id):
        for xb in issuelist:
            if xb['Status'] != 'Downloaded':
                if xb['Int_IssueNumber'] == int_iss:
-                   if Int_IssueNumber == xb['Int_IssueNumber']:
+                   if Int_IssueNumber == xb['Int_IssueNumber'] or IssueNumber is None:
                        valid = True
                    issueinfo.append({'issueid':      xb['IssueID'],
                                      'int_iss':      int_iss,

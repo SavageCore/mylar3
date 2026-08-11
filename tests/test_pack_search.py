@@ -78,3 +78,50 @@ def test_pack_title_strips_to_matchable_series(monkeypatch):
 
     matched = filechecker.FileChecker(watchcomic="Transmetropolitan").matchIT(parsed_comic)
     assert matched["process_status"] == "match"
+
+
+def test_whole_series_pack_detect_bare_series_name():
+    """A bare 'Watchmen (1986)' style title should be detected as a whole-series
+    pack in the name-only pack pass."""
+    from mylar import search_filer
+
+    sf = search_filer.search_check()
+
+    class FakeDB(object):
+        def __init__(self):
+            self.data = [
+                {'Int_IssueNumber': 1000},
+                {'Int_IssueNumber': 2000},
+                {'Int_IssueNumber': 12000},
+            ]
+
+        def select(self, query, args):
+            assert 'Wanted' in query
+            return self.data
+
+    import mylar
+    mylar.db.DBConnection = lambda: FakeDB()
+
+    result = sf._whole_series_pack_detect(
+        'Watchmen (1986)', 'Watchmen', '1986', '3622'
+    )
+    assert result is not None
+    assert result['title'] == 'Watchmen (1986)'
+    assert result['issues'] == '1-12'
+
+    # a single-issue title must not be treated as a whole-series pack
+    result = sf._whole_series_pack_detect(
+        'Watchmen 12 (1987)', 'Watchmen', '1986', '3622'
+    )
+    assert result is None
+
+
+def test_whole_series_pack_detect_wrong_series():
+    from mylar import search_filer
+
+    sf = search_filer.search_check()
+
+    result = sf._whole_series_pack_detect(
+        'Before Watchmen - Comedian (2012)', 'Watchmen', '1986', '3622'
+    )
+    assert result is None
