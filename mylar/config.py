@@ -113,6 +113,7 @@ _CONFIG_DEFINITIONS = OrderedDict({
     'SCAN_ON_SERIES_CHANGES': (bool, 'General', True),
     'CLEAR_PROVIDER_TABLE': (bool, 'General', False),
     'SEARCH_TIER_CUTOFF': (int, 'General', 14), # days
+    'PACKS_DEFAULT': (bool, 'General', False),
     'CUSTOM_ISSUE_EXCEPTIONS': (str, 'General', []),
 
     'RSS_CHECKINTERVAL': (int, 'Scheduler', 20),

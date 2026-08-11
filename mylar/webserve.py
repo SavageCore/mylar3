@@ -464,7 +464,7 @@ class WebInterface(object):
             ignore_type = None
             force_type = None
             age_rating = None
-            allowpacks = "0"
+            allowpacks = str(int(mylar.CONFIG.PACKS_DEFAULT))
             corrected_seriesyear = None
             torrentid_32p = None
             totalissues = '?'
@@ -596,7 +596,7 @@ class WebInterface(object):
             if mylar.CONFIG.DELETE_REMOVE_DIR is None:
                 mylar.CONFIG.DELETE_REMOVE_DIR = 0
             if allowpacks is None:
-                allowpacks = "0"
+                allowpacks = str(int(mylar.CONFIG.PACKS_DEFAULT))
             if all([comic['Corrected_SeriesYear'] is not None, comic['Corrected_SeriesYear'] != '', comic['Corrected_SeriesYear'] != 'None']):
                 if comic['Corrected_SeriesYear'] != comic['ComicYear']:
                     comic['ComicYear'] = comic['Corrected_SeriesYear']
@@ -6910,6 +6910,7 @@ class WebInterface(object):
                     "auto_update": helpers.checked(mylar.CONFIG.AUTO_UPDATE),
                     "max_logsize": mylar.CONFIG.MAX_LOGSIZE,
                     "keep_html_cache": helpers.checked(mylar.CONFIG.KEEP_HTML_CACHE),
+                    "packs_default": helpers.checked(mylar.CONFIG.PACKS_DEFAULT),
                     "annuals_on": helpers.checked(mylar.CONFIG.ANNUALS_ON),
                     "enable_check_folder": helpers.checked(mylar.CONFIG.ENABLE_CHECK_FOLDER),
                     "check_folder": mylar.CONFIG.CHECK_FOLDER,
@@ -7489,6 +7490,7 @@ class WebInterface(object):
                            'enable_meta', 'cbr2cbz_only', 'ct_tag_cr', 'ct_tag_cbl', 'ct_cbz_overwrite', 'cmtag_start_year_as_volume', 'cmtag_volume', 'setdefaultvolume',
                            'rename_files', 'replace_spaces', 'zero_level', 'sab_remove_completed', 'sab_remove_failed',
                            'lowercase_filenames', 'autowant_upcoming', 'autowant_all', 'comic_cover_local', 'cover_folder_local', 'series_metadata_local', 'alternate_latest_series_covers', 'cvinfo', 'snatchedtorrent_notify',
+                           'packs_default',
                            'prowl_enabled', 'prowl_onsnatch', 'pushover_enabled', 'pushover_onsnatch', 'pushover_image', 'mattermost_enabled', 'mattermost_onsnatch', 'boxcar_enabled',
                            'boxcar_onsnatch', 'pushbullet_enabled', 'pushbullet_onsnatch', 'telegram_enabled', 'telegram_onsnatch', 'telegram_image', 'discord_enabled', 'discord_onsnatch', 'slack_enabled', 'slack_onsnatch',
                            'email_enabled', 'email_enc', 'email_ongrab', 'email_onpost', 'gotify_enabled', 'gotify_server_url', 'gotify_token', 'gotify_onsnatch', 'opds_enable', 'opds_authentication', 'opds_metainfo', 'opds_pagesize', 'enable_ddl',
