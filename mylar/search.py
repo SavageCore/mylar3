@@ -244,8 +244,20 @@ def search_init(
         while tmp_prov_count > prov_count:
             logger.info('tmp_prov_count: %s / prov_count: %s' % (tmp_prov_count,prov_count))
             tmp_cmloopit = cmloopit
-            while tmp_cmloopit >= 1:
-                if tmp_cmloopit == 4:
+            # Build the ordered list of search passes for this provider.
+            # Normal passes search per-issue (cmloopit descending). When packs
+            # are allowed for this comic, also run a name-only pass so the
+            # indexer can return multi-issue pack releases.
+            passes = []
+            if allow_packs and mylar.CONFIG.PACK_PRIORITY:
+                passes.append(5)  # pack-first
+            passes.extend(x for x in range(cmloopit, 0, -1))
+            if allow_packs and not mylar.CONFIG.PACK_PRIORITY:
+                passes.append(5)  # pack as fallback
+            for tmp_cmloopit in passes:
+                if tmp_cmloopit == 5:
+                    tmp_IssueNumber = None
+                elif tmp_cmloopit == 4:
                     tmp_IssueNumber = None
                 else:
                     tmp_IssueNumber = IssueNumber
@@ -507,8 +519,6 @@ def search_init(
                     # don't think this is needed as we do the check_time btwn searches now
                     pass
 
-                tmp_cmloopit -= 1
-
 
             prov_count += 1
             logger.info('attempting to set %s to not being the active provider.'% (list(current_prov.keys())[0]))
@@ -764,7 +774,7 @@ def NZB_SEARCH(
             tmpprov = '%s (%s)' % (name_torznab, provider_stat['type'])
         else:
             tmpprov = nzbprov
-    if cmloopit == 4:
+    if cmloopit == 4 or cmloopit == 5:
         issuedisplay = None
         logger.info(
             'Shhh be very quiet...I\'m looking for %s (%s) using %s.'
@@ -911,7 +921,11 @@ def NZB_SEARCH(
                 break
             mod_isssearch = str(issdig) + str(isssearch)
         else:
-            if cmloopit == 4:
+            if cmloopit == 5:
+                # pack search - name only so multi-issue releases surface
+                comsearch = comsrc
+                mod_isssearch = ''
+            elif cmloopit == 4:
                 if any([booktype == 'TPB', booktype == 'HC', booktype == 'GN']):
                     comsearch = comsrc + "%20v" + str(isssearch)
                 mod_isssearch = ''
