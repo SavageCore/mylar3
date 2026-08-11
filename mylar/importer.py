@@ -528,6 +528,7 @@ def addComictoDB(comicid, mismatch=None, pullupd=None, imported=None, ogcname=No
                     "ComicPublished":     None, #"Unknown",
                     "Type":               booktype,
                     "Corrected_Type":     comic['Corrected_Type'],
+                    "AllowPacks":         str(int(mylar.CONFIG.PACKS_DEFAULT)),
                     "Collects":           issue_list,
                     "DateAdded":          helpers.today(),
                     "Status":             "Loading"}
