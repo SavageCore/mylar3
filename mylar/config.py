@@ -114,6 +114,7 @@ _CONFIG_DEFINITIONS = OrderedDict({
     'CLEAR_PROVIDER_TABLE': (bool, 'General', False),
     'SEARCH_TIER_CUTOFF': (int, 'General', 14), # days
     'PACKS_DEFAULT': (bool, 'General', False),
+    'PACK_PRIORITY': (bool, 'General', False),
     'CUSTOM_ISSUE_EXCEPTIONS': (str, 'General', []),
 
     'RSS_CHECKINTERVAL': (int, 'Scheduler', 20),
@@ -367,7 +368,6 @@ _CONFIG_DEFINITIONS = OrderedDict({
     'EXTERNAL_SERVER': (str, 'DDL', None),
     'EXTERNAL_USERNAME': (str, 'DDL', None),
     'EXTERNAL_APIKEY': (str, 'DDL', None),
-    'PACK_PRIORITY': (bool, 'DDL', False),
     'DDL_QUERY_DELAY': (int, 'DDL', 15),
     'DDL_LOCATION': (str, 'DDL', None),
     'DDL_AUTORESUME': (bool, 'DDL', True),
