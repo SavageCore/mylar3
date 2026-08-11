@@ -115,6 +115,7 @@ _CONFIG_DEFINITIONS = OrderedDict({
     'SEARCH_TIER_CUTOFF': (int, 'General', 14), # days
     'PACKS_DEFAULT': (bool, 'General', False),
     'PACK_PRIORITY': (bool, 'General', False),
+    'AUTOSEARCH_ENDED': (bool, 'General', False),
     'CUSTOM_ISSUE_EXCEPTIONS': (str, 'General', []),
 
     'RSS_CHECKINTERVAL': (int, 'Scheduler', 20),

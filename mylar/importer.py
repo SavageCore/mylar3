@@ -704,6 +704,38 @@ def addComictoDB(comicid, mismatch=None, pullupd=None, imported=None, ogcname=No
                     logger.info('Finished grabbing what I could.')
                 else:
                     logger.info('Already have the latest issue : #' + str(latestiss))
+        elif mylar.CONFIG.AUTOSEARCH_ENDED and lastpubdate != 'Present':
+            # auto-search wanted issues for ended (or otherwise non-Present) series
+            if calledfrom != 'maintenance':
+                results = []
+                issresults = myDB.select("SELECT * FROM issues where ComicID=? AND Status='Wanted'", [comicid])
+                if issresults:
+                    for issr in issresults:
+                        results.append({'IssueID':       issr['IssueID'],
+                                        'Issue_Number':  issr['Issue_Number'],
+                                        'Status':        issr['Status']
+                                       })
+                if mylar.CONFIG.ANNUALS_ON:
+                    an_results = myDB.select("SELECT * FROM annuals WHERE ComicID=? AND Status='Wanted' AND NOT Deleted", [comicid])
+                    if an_results:
+                        for ar in an_results:
+                            results.append({'IssueID':       ar['IssueID'],
+                                            'Issue_Number':  ar['Issue_Number'],
+                                            'Status':        ar['Status']
+                                           })
+
+                if results:
+                    logger.info('[AUTO-SEARCH-ENDED] Attempting to grab wanted issues for : '  + comic['ComicName'])
+                    search_list = []
+                    for result in results:
+                        logger.fdebug('Searching for : ' + str(result['Issue_Number']))
+                        logger.fdebug('Status of : ' + str(result['Status']))
+                        search_list.append(result['IssueID'])
+                    if len(search_list) > 0:
+                        threading.Thread(target=search.searchIssueIDList, args=[search_list]).start()
+                else: logger.info('No issues marked as wanted for ' + comic['ComicName'])
+
+                logger.info('Finished grabbing what I could.')
 
     if chkwant is not None:
         #if this isn't None, this is being called from the futureupcoming list
