@@ -125,3 +125,25 @@ def test_whole_series_pack_detect_wrong_series():
         'Before Watchmen - Comedian (2012)', 'Watchmen', '1986', '3622'
     )
     assert result is None
+
+
+def test_ddlrss_pack_detect_no_hash_no_space_after_dash():
+    """Titles like 'Preacher 1-66 ...' have no '#' and no space after the dash."""
+    result = rsscheck.ddlrss_pack_detect(
+        'Preacher 1-66 (complete, noAds) (theProletariat-DCP)', 'http://example.com'
+    )
+    assert result is not None
+    assert result['pack'] is True
+
+
+def test_ddlrss_pack_detect_preacher_family():
+    """Preacher-style no-space dash ranges must detect as packs."""
+    for t, exp in [
+        ('Preacher 1-66 (complete, noAds) (theProletariat-DCP)', '1-66'),
+        ('Preacher 1 - 66 (complete)', '1 - 66'),
+        ('Preacher #1-66 (complete)', '1-66'),
+    ]:
+        result = rsscheck.ddlrss_pack_detect(t, 'http://example.com')
+        assert result is not None, t
+        assert result['pack'] is True, t
+        assert result['issues'] == exp, (t, result['issues'])

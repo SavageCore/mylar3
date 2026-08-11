@@ -1566,6 +1566,15 @@ def ddlrss_pack_detect(title, link):
                 if title[set_sp:space_beforedash].strip().isdigit():
                     issues = title[set_sp:iss_end].strip()
                     pack = True
+        else:
+            # no spaces around the dash, e.g. "Preacher 1-66 ...". Search only
+            # the portion before any parentheses so year ranges like
+            # "(1997-2002)" and dates like "2010-01-01" are not matched.
+            pre = title.split('(')[0]
+            dchk = re.search(r'(?<!\d)(\d+)\s*-\s*(\d+)(?!\d)', pre)
+            if dchk and not 1000 <= int(dchk.group(1)) <= 2100:
+                issues = '%s-%s' % (dchk.group(1), dchk.group(2))
+                pack = True
 
     # if it's a pack - remove the issue-range and the possible issue years
     # (cause it most likely will span) and pass thru as separate items
