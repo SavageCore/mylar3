@@ -99,6 +99,39 @@ class PostProcessor(object):
             self.comicid = None
 
         self.issuearcid = None
+        self.notify_buffer = []
+        self.notify_group_pack = False
+
+    def _buffer_notify(self, prline, prline2, imageFile, module):
+        self.notify_buffer.append(
+            {
+                'prline': prline,
+                'prline2': prline2,
+                'imageFile': imageFile,
+                'module': module,
+            }
+        )
+
+    def _flush_notify(self):
+        if not self.notify_buffer:
+            return
+        buffered = self.notify_buffer
+        self.notify_buffer = []
+        grouped = []
+        for b in buffered:
+            if b['prline'] not in grouped:
+                grouped.append(b['prline'])
+        series = grouped[0].split(' (')[0] if len(grouped) > 0 else ''
+        summary = '\n'.join(grouped)
+        self.sendnotify(
+            series,
+            issueyear=None,
+            issuenumOG=None,
+            annchk='no',
+            module=buffered[0]['module'],
+            imageFile=buffered[0]['imageFile'],
+            grouped_issues=summary,
+        )
 
     def _log(self, message, level=logger): #.message):  #level=logger.MESSAGE):
         """
@@ -2717,6 +2750,8 @@ class PostProcessor(object):
             elif len(manual_arclist) > 0:
                 logger.info('%s Manual post-processing completed for %s story-arc issues.' % (module, len(manual_arclist)))
             i = 0
+            if mylar.CONFIG.NOTIFY_GROUP_PACKS and len(manual_list) > 1:
+                self.notify_group_pack = True
 
             for ml in manual_list:
                 i+=1
@@ -2754,6 +2789,10 @@ class PostProcessor(object):
                     stat = ' [%s/%s]' % (i, len(manual_list))
                     self.Process_next(comicid, issueid, issuenumOG, ml, stat)
                     dupthis = None
+
+            if self.notify_group_pack:
+                self._flush_notify()
+                self.notify_group_pack = False
 
             if self.failed_files == 0:
                 logger.info('%s Manual post-processing completed for %s issues.' % (module, i))
@@ -3394,7 +3433,7 @@ class PostProcessor(object):
             return self.queue.put(self.valreturn)
 
 
-    def sendnotify(self, series, issueyear, issuenumOG, annchk, module, imageFile, issueid=None):
+    def sendnotify(self, series, issueyear, issuenumOG, annchk, module, imageFile, issueid=None, grouped_issues=None):
 
         if issuenumOG is not None:
             if '#' not in issuenumOG:
@@ -3411,6 +3450,23 @@ class PostProcessor(object):
             else:
                 prline = '%s' % (series)
         prline2 = 'Mylar has downloaded and post-processed: ' + prline
+
+        if grouped_issues:
+            issue_list = grouped_issues.split('\n')
+            prline2 = 'Mylar has downloaded and post-processed %s issue(s):\n%s' % (
+                len(issue_list),
+                grouped_issues,
+            )
+
+        if (
+            mylar.CONFIG.NOTIFY_GROUP_PACKS
+            and self.notify_group_pack
+            and issuenumOG is not None
+        ):
+            # pack post-processing: buffer per-issue notifications and flush a
+            # single grouped summary once all issues are done.
+            self._buffer_notify(prline, prline2, imageFile, module)
+            return
 
         try:
             if mylar.CONFIG.PROWL_ENABLED:
@@ -3440,7 +3496,14 @@ class PostProcessor(object):
 
             if mylar.CONFIG.MATTERMOST_ENABLED:
                 mattermost = notifiers.MATTERMOST()
-                metadata = { 'series':series, 'issue': issuenumOG, 'year': issueyear }
+                if grouped_issues:
+                    metadata = {
+                        'series': series,
+                        'issue': '%s issues' % len(issue_list),
+                        'year': '',
+                    }
+                else:
+                    metadata = { 'series':series, 'issue': issuenumOG, 'year': issueyear }
                 mattermost.notify("Downloading and Postprocessing completed", prline2, metadata=metadata, imageFile=imageFile, module=module)
 
             if mylar.CONFIG.DISCORD_ENABLED:
@@ -3454,7 +3517,10 @@ class PostProcessor(object):
 
             if mylar.CONFIG.GOTIFY_ENABLED:
                 gotify = notifiers.GOTIFY()
-                metadata = { 'series':series, 'issue': issuenumOG, 'year': issueyear, 'issueid': issueid }
+                if grouped_issues:
+                    metadata = { 'series':series, 'issue': len(issue_list), 'year': '', 'issueid': None }
+                else:
+                    metadata = { 'series':series, 'issue': issuenumOG, 'year': issueyear, 'issueid': issueid }
                 gotify.notify("Download and Postprocessing completed", prline2, module=module, imageFile=imageFile, metadata=metadata)
         except Exception as e:
             logger.warn('[NOTIFICATION] Unable to send notification: %s' % e)
