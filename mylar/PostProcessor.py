@@ -2284,6 +2284,8 @@ class PostProcessor(object):
                         dspcname = None
                         dspcyear = None
                 i = 0
+                if mylar.CONFIG.NOTIFY_GROUP_PACKS and len(manual_list) > 1:
+                    self.notify_group_pack = True
 
                 for ml in manual_list:
                     i+=1
@@ -2320,6 +2322,10 @@ class PostProcessor(object):
                         stat = ' [%s/%s]' % (i, len(manual_list))
                         self.Process_next(comicid, issueid, issuenumOG, ml, stat)
                         dupthis = None
+
+                if self.notify_group_pack:
+                    self._flush_notify()
+                    self.notify_group_pack = False
 
                 m_event = None
                 if self.failed_files == 0:
@@ -2750,8 +2756,6 @@ class PostProcessor(object):
             elif len(manual_arclist) > 0:
                 logger.info('%s Manual post-processing completed for %s story-arc issues.' % (module, len(manual_arclist)))
             i = 0
-            if mylar.CONFIG.NOTIFY_GROUP_PACKS and len(manual_list) > 1:
-                self.notify_group_pack = True
 
             for ml in manual_list:
                 i+=1
