@@ -15,6 +15,7 @@
 
 from mylar import logger
 import base64
+import re
 import cherrypy
 import urllib.request, urllib.parse, urllib.error
 import urllib.request, urllib.error, urllib.parse
@@ -663,15 +664,23 @@ class DISCORD:
             # If snatched or error is not in the message, it's a download and post-process
             else:
                 logger.info('attachment_text:%s' % (attachment_text,))
-                # extract series and issue number
-                series_num = attachment_text[41:]
-                series_num_split = series_num.split()
-                issue = series_num_split[len(series_num_split) - 1]
-                series_num_split.pop()
-                series = ' '.join(map(str, series_num_split))
-
-                # If there's an image file, put it in
-                if imageFile is not None:
+                grouped_match = re.search(
+                    r'Mylar has downloaded and post-processed (\d+) issue\(s\):\n(.+)',
+                    attachment_text,
+                    re.DOTALL,
+                )
+                if grouped_match:
+                    # grouped pack notification: one embed, cover from the first
+                    # issue, series name + per-line issue list as fields
+                    issue_lines = grouped_match.group(2).strip().split('\n')
+                    # each line is e.g. "Preacher Special: Saint of Killers (1996) #1"
+                    first_issue = issue_lines[0] if issue_lines else ''
+                    series = re.sub(r'\s*#[\d\w.]+$', '', first_issue).strip()
+                    # first issue number matches the cover image
+                    first_issue_num = re.search(r'#([\d\w.]+)$', first_issue)
+                    issue_label = (
+                        first_issue_num.group(1) if first_issue_num else 'N/A'
+                    )
                     payload["content"] = attachment_text
                     payload["embeds"] = [
                             {
@@ -683,12 +692,12 @@ class DISCORD:
                                 "fields": [
                                     {
                                         "name": "Series",
-                                        "value": series,
+                                        "value": '%s\n%s' % (series, '\n'.join(issue_lines)),
                                         "inline": "true"
                                     },
                                     {
                                         "name": "Issue",
-                                        "value": issue,
+                                        "value": issue_label,
                                         "inline": "true"
                                     },
                                 ],
@@ -699,29 +708,65 @@ class DISCORD:
                             }
                         ]
                 else:
-                    payload["content"] = attachment_text
-                    payload["embeds"] = [
-                            {
-                                "author": {
-                                    "name": "Downloaded by Mylar"
-                                },
-                                "description": "Issue downloaded!",
-                                "color": 32768,
-                                "fields": [
-                                    {
-                                        "name": "Series",
-                                        "value": series,
-                                        "inline": "true"
+                    # extract series and issue number
+                    series_num = attachment_text[41:]
+                    series_num_split = series_num.split()
+                    issue = series_num_split[len(series_num_split) - 1]
+                    series_num_split.pop()
+                    series = ' '.join(map(str, series_num_split))
+
+                    # If there's an image file, put it in
+                    if imageFile is not None:
+                        payload["content"] = attachment_text
+                        payload["embeds"] = [
+                                {
+                                    "author": {
+                                        "name": "Downloaded by Mylar"
                                     },
-                                    {
-                                        "name": "Issue",
-                                        "value": issue,
-                                        "inline": "true"
+                                    "description": "Issue downloaded!",
+                                    "color": 32768,
+                                    "fields": [
+                                        {
+                                            "name": "Series",
+                                            "value": series,
+                                            "inline": "true"
+                                        },
+                                        {
+                                            "name": "Issue",
+                                            "value": issue,
+                                            "inline": "true"
+                                        },
+                                    ],
+                                    "image": {
+                                        "url": "attachment://image.jpg",
                                     },
-                                ],
-                                "timestamp": timestamp
-                            }
-                        ]
+                                    "timestamp": timestamp
+                                }
+                            ]
+                    else:
+                        payload["content"] = attachment_text
+                        payload["embeds"] = [
+                                {
+                                    "author": {
+                                        "name": "Downloaded by Mylar"
+                                    },
+                                    "description": "Issue downloaded!",
+                                    "color": 32768,
+                                    "fields": [
+                                        {
+                                            "name": "Series",
+                                            "value": series,
+                                            "inline": "true"
+                                        },
+                                        {
+                                            "name": "Issue",
+                                            "value": issue,
+                                            "inline": "true"
+                                        },
+                                    ],
+                                    "timestamp": timestamp
+                                }
+                            ]
 
         if imageFile is not None:
             files = {

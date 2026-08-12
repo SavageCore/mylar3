@@ -1,3 +1,4 @@
+import json
 import pytest
 
 
@@ -118,3 +119,55 @@ def test_no_grouping_when_disabled(monkeypatch):
     pp.sendnotify('Watchmen', '1986', '#1', 'no', '[POST-PROCESSING]', None)
     assert len(sent) == 1
     assert '#1' in sent[0]
+
+
+@pytest.mark.unit
+def test_discord_grouped_notification_format(monkeypatch):
+    """Grouped notifications should build a Discord embed with the series name,
+    a per-line issue list, and the cover issue number."""
+    import mylar
+    from mylar import notifiers
+
+    monkeypatch.setattr(
+        mylar, "CONFIG",
+        FakeConfig(NOTIFY_GROUP_PACKS=True, DISCORD_ENABLED=True,
+                   DISCORD_WEBHOOK_URL="http://example.com"),
+    )
+
+    posts = []
+
+    class FakePost(object):
+        def __init__(self, *a, **kw):
+            self.status_code = 200
+            self.text = 'ok'
+
+    import requests
+    monkeypatch.setattr(
+        requests, 'post',
+        lambda *a, **kw: (posts.append((a, kw)) or FakePost()),
+    )
+
+    discord = notifiers.DISCORD()
+    attachment = (
+        'Mylar has downloaded and post-processed 4 issue(s):\n'
+        'Preacher Special: Saint of Killers (1996) #1\n'
+        'Preacher Special: Saint of Killers (1996) #2\n'
+        'Preacher Special: Saint of Killers (1996) #3\n'
+        'Preacher Special: Saint of Killers (1996) #4'
+    )
+    discord.notify(
+        'Download and Postprocessing completed',
+        attachment,
+        module='[POST-PROCESSING][NOTIFIER]',
+        imageFile=None,
+    )
+
+    assert len(posts) == 1
+    kwargs = posts[0][1]
+    payload = json.loads(kwargs['data'])
+    embed = payload['embeds'][0]
+    fields = {f['name']: f['value'] for f in embed['fields']}
+    assert fields['Series'].startswith('Preacher Special: Saint of Killers (1996)')
+    assert 'Preacher Special: Saint of Killers (1996) #4' in fields['Series']
+    assert fields['Issue'] == '1'
+    assert payload['content'].startswith('Mylar has downloaded and post-processed 4 issue(s):')
