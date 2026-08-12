@@ -64,6 +64,84 @@ def test_loopchk_always_includes_stripped_variant(monkeypatch, filename):
         assert any(("tallinsaddle" in x or "saintofkillers" in x or "goodoldboys" in x) for x in loopchk)
 
 
+@pytest.mark.parametrize("annuals_on", [True, False])
+@pytest.mark.unit
+def test_matchit_special_file_vs_no_special_watchcomic(monkeypatch, annuals_on):
+    """matchIT must match a filename containing 'Special' against a watchcomic
+    that omits the word (e.g. 'Preacher Special - Tall in the Saddle' file vs
+    watchcomic 'Preacher: Tall in the Saddle'), regardless of ANNUALS_ON."""
+    monkeypatch.setattr(mylar, "CONFIG", mylar.config.Config("./nothing"))
+    monkeypatch.setattr(mylar.CONFIG, "IGNORE_SEARCH_WORDS", [], raising=False)
+    monkeypatch.setattr(mylar.CONFIG, "CUSTOM_ISSUE_EXCEPTIONS", [], raising=False)
+    monkeypatch.setattr(mylar.CONFIG, "READ2FILENAME", False, raising=False)
+    monkeypatch.setattr(mylar.CONFIG, "FOLDER_SCAN_LOG_VERBOSE", False, raising=False)
+    monkeypatch.setattr(mylar.CONFIG, "ANNUALS_ON", annuals_on, raising=False)
+
+    fl = {
+        "sub": "Specials",
+        "comicfilename": "Preacher Special - Tall in the Saddle (2000) (digital) (Minutemen-Midas).cbr",
+        "comiclocation": "/tmp/opencode/pack",
+        "series_name": "Preacher Special - Tall in the Saddle",
+        "series_name_decoded": "Preacher Special - Tall in the Saddle",
+        "issueid": None,
+        "alt_series": "Preacher Special",
+        "alt_issue": "Tall in the Saddle (2000) (digital)",
+        "dynamic_name": "PreacherSpecial|Tallin|Saddle",
+        "series_volume": "v1",
+        "issue_year": "2000",
+        "issue_number": None,
+        "scangroup": "Minutemen-Midas",
+        "reading_order": None,
+        "booktype": "TPB/GN/HC/One-Shot",
+    }
+    wm = filechecker.FileChecker(
+        watchcomic="Preacher: Tall in the Saddle",
+        Publisher=None,
+        AlternateSearch=None,
+        manual={"Type": "One-Shot", "Total": 1, "ComicID": "18167", "SeriesYear": "2000"},
+    )
+    res = wm.matchIT(fl)
+    assert res["process_status"] == "match"
+
+
+@pytest.mark.unit
+def test_matchit_special_special_watchcomic_still_matches(monkeypatch):
+    """Files for specials whose watchcomic keeps the word 'Special' (e.g.
+    'Preacher Special: Saint of Killers') must still match."""
+    monkeypatch.setattr(mylar, "CONFIG", mylar.config.Config("./nothing"))
+    monkeypatch.setattr(mylar.CONFIG, "IGNORE_SEARCH_WORDS", [], raising=False)
+    monkeypatch.setattr(mylar.CONFIG, "CUSTOM_ISSUE_EXCEPTIONS", [], raising=False)
+    monkeypatch.setattr(mylar.CONFIG, "READ2FILENAME", False, raising=False)
+    monkeypatch.setattr(mylar.CONFIG, "FOLDER_SCAN_LOG_VERBOSE", False, raising=False)
+    monkeypatch.setattr(mylar.CONFIG, "ANNUALS_ON", False, raising=False)
+
+    fl = {
+        "sub": None,
+        "comicfilename": "Preacher Special - Saint of Killers 01 (1996) (digital).cbr",
+        "comiclocation": "/tmp/opencode/pack",
+        "series_name": "Preacher Special - Saint of Killers",
+        "series_name_decoded": "Preacher Special - Saint of Killers",
+        "issueid": None,
+        "alt_series": None,
+        "alt_issue": None,
+        "dynamic_name": "Preacherspecial|SaintofKillers",
+        "series_volume": None,
+        "issue_year": "1996",
+        "issue_number": "01",
+        "scangroup": None,
+        "reading_order": None,
+        "booktype": "issue",
+    }
+    wm = filechecker.FileChecker(
+        watchcomic="Preacher Special: Saint of Killers",
+        Publisher=None,
+        AlternateSearch=None,
+        manual={"Type": "Print", "Total": 4, "ComicID": "5757", "SeriesYear": "1996"},
+    )
+    res = wm.matchIT(fl)
+    assert res["process_status"] == "match"
+
+
 @pytest.mark.unit
 def test_loopchk_tall_in_saddle_matches_db_name(monkeypatch):
     """ANNUALS_ON=False must still produce 'preachertallinsaddle' so the DB query
