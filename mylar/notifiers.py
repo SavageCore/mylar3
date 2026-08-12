@@ -671,33 +671,40 @@ class DISCORD:
                 )
                 if grouped_match:
                     # grouped pack notification: one embed, cover from the first
-                    # issue, series name + per-line issue list as fields
+                    # issue, series name once, no per-issue field
                     issue_lines = grouped_match.group(2).strip().split('\n')
                     # each line is e.g. "Preacher Special: Saint of Killers (1996) #1"
                     first_issue = issue_lines[0] if issue_lines else ''
                     series = re.sub(r'\s*#[\d\w.]+$', '', first_issue).strip()
-                    # first issue number matches the cover image
-                    first_issue_num = re.search(r'#([\d\w.]+)$', first_issue)
-                    issue_label = (
-                        first_issue_num.group(1) if first_issue_num else 'N/A'
+                    numbers = []
+                    for l in issue_lines:
+                        m = re.search(r'#([\d\w.]+)$', l)
+                        numbers.append(m.group(1) if m else l)
+                    # proper English list: "1, 2, 3 and 4"
+                    if len(numbers) == 1:
+                        number_text = numbers[0]
+                    elif len(numbers) == 2:
+                        number_text = '%s and %s' % (numbers[0], numbers[1])
+                    else:
+                        number_text = '%s and %s' % (
+                            ', '.join(numbers[:-1]),
+                            numbers[-1],
+                        )
+                    payload["content"] = (
+                        'Mylar has downloaded and post-processed %s issue(s): %s'
+                        % (grouped_match.group(1), number_text)
                     )
-                    payload["content"] = attachment_text
                     payload["embeds"] = [
                             {
                                 "author": {
                                     "name": "Downloaded by Mylar"
                                 },
-                                "description": "Issue downloaded!",
+                                "description": "Issues downloaded!",
                                 "color": 32768,
                                 "fields": [
                                     {
                                         "name": "Series",
-                                        "value": '%s\n%s' % (series, '\n'.join(issue_lines)),
-                                        "inline": "true"
-                                    },
-                                    {
-                                        "name": "Issue",
-                                        "value": issue_label,
+                                        "value": series,
                                         "inline": "true"
                                     },
                                 ],

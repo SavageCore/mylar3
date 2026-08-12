@@ -166,8 +166,10 @@ def test_discord_grouped_notification_format(monkeypatch):
     kwargs = posts[0][1]
     payload = json.loads(kwargs['data'])
     embed = payload['embeds'][0]
+    assert embed['description'] == 'Issues downloaded!'
     fields = {f['name']: f['value'] for f in embed['fields']}
-    assert fields['Series'].startswith('Preacher Special: Saint of Killers (1996)')
-    assert 'Preacher Special: Saint of Killers (1996) #4' in fields['Series']
-    assert fields['Issue'] == '1'
-    assert payload['content'].startswith('Mylar has downloaded and post-processed 4 issue(s):')
+    assert list(fields.keys()) == ['Series']
+    assert fields['Series'] == 'Preacher Special: Saint of Killers (1996)'
+    assert payload['content'] == (
+        'Mylar has downloaded and post-processed 4 issue(s): 1, 2, 3 and 4'
+    )
