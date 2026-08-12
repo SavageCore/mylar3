@@ -586,6 +586,17 @@ class PostProcessor(object):
                         mod_seriesname = re.sub('annual', '', mod_seriesname, flags=re.I).strip()
                         mod_seriesname = re.sub('special', '', mod_seriesname, flags=re.I).strip()
 
+                    #add the annuals/specials-stripped variant of the parsed filename as well, so
+                    #one-shot specials whose DB DynamicComicName omits the word (e.g. 'Preacher:
+                    #Tall in the Saddle' -> 'preachertallinsaddle') still match regardless of the
+                    #ANNUALS_ON setting.
+                    if any(['annual' in orig_seriesname.lower(), 'special' in orig_seriesname.lower()]):
+                        mod_seriesname_annuals = re.sub('2021annual', '', orig_seriesname, flags=re.I).strip()
+                        mod_seriesname_annuals = re.sub('annual', '', mod_seriesname_annuals, flags=re.I).strip()
+                        mod_seriesname_annuals = re.sub('special', '', mod_seriesname_annuals, flags=re.I).strip()
+                        if mod_seriesname_annuals != orig_seriesname and not any(re.sub(r'[\|\s]', '', mod_seriesname_annuals).lower() == x for x in loopchk):
+                            loopchk.append(re.sub(r'[\|\s]', '', mod_seriesname_annuals.lower()))
+
                     #make sure we add back in the original parsed filename here.
                     if not any(re.sub(r'[\|\s]', '', mod_seriesname).lower() == x for x in loopchk):
                         loopchk.append(re.sub(r'[\|\s]', '', mod_seriesname.lower()))
