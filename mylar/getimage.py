@@ -81,6 +81,39 @@ def scale_image(img, iformat, new_width, algorithm=Image.LANCZOS):
         img.save(output, format=iformat)
         return output.getvalue()
 
+
+def build_slideshow_gif(images, width=400, max_frames=8, frame_ms=1000, loop=0):
+    """Build an animated GIF slideshow from a list of base64-encoded cover
+    images. Each image is resized to `width` wide and shown for `frame_ms`.
+    Returns base64 of the GIF, or None if there aren't enough valid frames."""
+    if PIL_Found is False or not images:
+        return None
+    frames = []
+    for img_b64 in images[:max_frames]:
+        if not img_b64:
+            continue
+        try:
+            img = Image.open(BytesIO(base64.b64decode(img_b64)))
+            img = img.convert('RGB')
+            scale = width / float(img.size[0])
+            img = img.resize((width, int(img.size[1] * scale)), Image.LANCZOS)
+            frames.append(img)
+        except Exception as e:
+            logger.fdebug('[SLIDESHOW] Skipping frame: %s' % e)
+    if not frames:
+        return None
+    with BytesIO() as output:
+        frames[0].save(
+            output,
+            format='GIF',
+            save_all=True,
+            append_images=frames[1:],
+            duration=frame_ms,
+            loop=loop,
+        )
+        return base64.b64encode(output.getvalue()).decode('ascii')
+
+
 def extract_image(location, single=False, imquality=None, comicname=None):
     #location = full path to the cbr/cbz (filename included in path)
     #single = should be set to True so that a single file can have the coverfile

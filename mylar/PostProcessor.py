@@ -118,18 +118,33 @@ class PostProcessor(object):
         buffered = self.notify_buffer
         self.notify_buffer = []
         grouped = []
+        covers = []
         for b in buffered:
             if b['prline'] not in grouped:
                 grouped.append(b['prline'])
+            if b['imageFile']:
+                covers.append(b['imageFile'])
         series = grouped[0].split(' (')[0] if len(grouped) > 0 else ''
         summary = '\n'.join(grouped)
+        # for multi-issue packs, optionally animate a slideshow of the covers.
+        # Only Discord handles animated GIF embeds properly, so other targets
+        # keep the static first cover.
+        imageFile = None
+        if (
+            mylar.CONFIG.NOTIFY_PACK_GIF
+            and len(covers) > 1
+            and mylar.CONFIG.DISCORD_ENABLED
+        ):
+            imageFile = getimage.build_slideshow_gif(covers)
+        if imageFile is None:
+            imageFile = buffered[0]['imageFile']
         self.sendnotify(
             series,
             issueyear=None,
             issuenumOG=None,
             annchk='no',
             module=buffered[0]['module'],
-            imageFile=buffered[0]['imageFile'],
+            imageFile=imageFile,
             grouped_issues=summary,
         )
 

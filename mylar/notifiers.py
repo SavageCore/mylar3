@@ -576,6 +576,11 @@ class DISCORD:
         payload = {}
         timestamp = str(datetime.utcnow())
 
+        # animated GIF covers (pack slideshow) vs static cover images
+        image_is_gif = imageFile is not None and imageFile[:6] == 'R0lGOD'
+        image_ext = 'gif' if image_is_gif else 'jpg'
+        image_mime = 'image/gif' if image_is_gif else 'image/jpeg'
+
         payload = {
                "username": "Mylar",
                "avatar_url": "https://github.com/MylarComics/mylar3/raw/stable/data/images/mylarlogo.png",
@@ -709,7 +714,7 @@ class DISCORD:
                                     },
                                 ],
                                 "image": {
-                                    "url": "attachment://image.jpg",
+                                    "url": "attachment://image.%s" % image_ext,
                                 },
                                 "timestamp": timestamp
                             }
@@ -778,7 +783,7 @@ class DISCORD:
         if imageFile is not None:
             files = {
                 'payload_json': (None, json.dumps(payload)),
-                'file1': ('image.jpg', base64.b64decode(imageFile))
+                'file1': ('image.%s' % image_ext, base64.b64decode(imageFile), image_mime)
             }
             try:
                 response = requests.post(self.webhook_url, files=files, verify=True)

@@ -117,6 +117,7 @@ _CONFIG_DEFINITIONS = OrderedDict({
     'PACK_PRIORITY': (bool, 'General', False),
     'AUTOSEARCH_ENDED': (bool, 'General', False),
     'NOTIFY_GROUP_PACKS': (bool, 'General', False),
+    'NOTIFY_PACK_GIF': (bool, 'General', False),
     'CUSTOM_ISSUE_EXCEPTIONS': (str, 'General', []),
 
     'RSS_CHECKINTERVAL': (int, 'Scheduler', 20),

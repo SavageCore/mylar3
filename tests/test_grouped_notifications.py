@@ -21,6 +21,7 @@ class FakeConfig(object):
             'EMAIL_ONPOST': False,
             'GOTIFY_ENABLED': False,
             'NOTIFY_GROUP_PACKS': False,
+            'NOTIFY_PACK_GIF': False,
         }
         defaults.update(overrides)
         for k, v in defaults.items():
@@ -173,3 +174,75 @@ def test_discord_grouped_notification_format(monkeypatch):
     assert payload['content'] == (
         'Mylar has downloaded and post-processed 4 issue(s): 1, 2, 3 and 4'
     )
+
+
+@pytest.mark.unit
+def test_build_slideshow_gif(monkeypatch):
+    """Slideshow GIF builder should produce a GIF from multiple base64 covers,
+    capped at max_frames, and return None when PIL is unavailable."""
+    from mylar import getimage
+
+    if getimage.PIL_Found is False:
+        return
+
+    # build two tiny JPEGs
+    from PIL import Image
+    import io as _io
+    imgs = []
+    for color in ((255, 0, 0), (0, 255, 0), (0, 0, 255)):
+        buf = _io.BytesIO()
+        Image.new('RGB', (100, 150), color).save(buf, 'JPEG')
+        imgs.append(__import__('base64').b64encode(buf.getvalue()).decode('ascii'))
+
+    gif = getimage.build_slideshow_gif(imgs, width=400, max_frames=8)
+    assert gif is not None
+    assert gif[:6] == 'R0lGOD'  # GIF89a/GIF87a header
+
+    # capped at max_frames
+    many = imgs * 4
+    gif2 = getimage.build_slideshow_gif(many, width=400, max_frames=8)
+    assert gif2 is not None
+    assert len(getimage.build_slideshow_gif(many, max_frames=2) or '') > 0
+
+    # no valid frames -> None
+    assert getimage.build_slideshow_gif([]) is None
+
+
+@pytest.mark.unit
+def test_notify_pack_gif_gated_by_discord(monkeypatch):
+    """The slideshow GIF should only be produced when NOTIFY_PACK_GIF is on AND
+    Discord is enabled; otherwise the static cover is used."""
+    import mylar
+    from mylar import PostProcessor, getimage
+
+    monkeypatch.setattr(mylar, "CONFIG", FakeConfig(
+        NOTIFY_GROUP_PACKS=True,
+        NOTIFY_PACK_GIF=True,
+        DISCORD_ENABLED=True,
+    ))
+
+    produced = []
+
+    def fake_build(images, **kw):
+        produced.append(images)
+        return 'R0lGOD-fakegif'
+
+    monkeypatch.setattr(getimage, 'build_slideshow_gif', fake_build)
+
+    pp = object.__new__(PostProcessor.PostProcessor)
+    pp.notify_buffer = []
+    pp.notify_group_pack = True
+    pp.module = '[TEST]'
+    pp.notify_buffer = [
+        {'prline': 'S (2000) #1', 'prline2': 'x', 'imageFile': 'AAA', 'module': '[T]'},
+        {'prline': 'S (2000) #2', 'prline2': 'x', 'imageFile': 'BBB', 'module': '[T]'},
+    ]
+
+    sent = []
+    pp.sendnotify = lambda *a, **kw: sent.append((a, kw))
+
+    pp._flush_notify()
+    assert len(produced) == 1
+    assert produced[0] == ['AAA', 'BBB']
+    # GIF passed to sendnotify
+    assert sent[0][1]['imageFile'] == 'R0lGOD-fakegif'
