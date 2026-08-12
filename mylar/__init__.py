@@ -863,11 +863,22 @@ def dbcheck():
     c.execute('CREATE TABLE IF NOT EXISTS notifs(session_id INT, date TEXT, event TEXT, comicid TEXT, comicname TEXT, issuenumber TEXT, seriesyear TEXT, status TEXT, message TEXT, PRIMARY KEY (session_id, date))')
     c.execute('CREATE TABLE IF NOT EXISTS provider_searches(id INTEGER UNIQUE, provider TEXT UNIQUE, type TEXT, lastrun INTEGER, active TEXT, hits INTEGER DEFAULT 0)')
     c.execute('CREATE TABLE IF NOT EXISTS mylar_info(DatabaseVersion INTEGER PRIMARY KEY)')
+    c.execute('CREATE TABLE IF NOT EXISTS checked_files ('
+              'file_path TEXT NOT NULL, '
+              'ComicID TEXT NOT NULL, '
+              'mtime INTEGER NOT NULL, '
+              'size INTEGER NOT NULL, '
+              'IssueID TEXT, '
+              'Int_IssueNumber INTEGER, '
+              'observed_status TEXT, '
+              'last_checked TEXT, '
+              'PRIMARY KEY (file_path, ComicID))')
     conn.commit()
 
     #create some indexes
     c.execute('CREATE INDEX IF NOT EXISTS issues_id on issues(IssueID)')
     c.execute('CREATE INDEX IF NOT EXISTS comics_id on comics(ComicID)')
+    c.execute('CREATE INDEX IF NOT EXISTS checked_files_comicid on checked_files(ComicID)')
 
     #might enable these at a later date.
     #c.execute('''PRAGMA synchronous = EXTRA''')

@@ -276,6 +276,7 @@ _CONFIG_DEFINITIONS = OrderedDict({
     'CHECK_FOLDER': (str, 'PostProcess', None),
     'MANUAL_PP_FOLDER': (str, 'PostProcess', None),
     'FOLDER_CACHE_LOCATION': (str, 'PostProcess', None),
+    'FOLDER_MONITOR_CACHE': (bool, 'PostProcess', True),
 
     'PROVIDER_ORDER': (str, 'Providers', None),
     'USENET_RETENTION': (int, 'Providers', 3500),

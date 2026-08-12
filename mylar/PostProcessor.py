@@ -44,7 +44,7 @@ class PostProcessor(object):
     FOLDER_NAME = 2
     FILE_NAME = 3
 
-    def __init__(self, nzb_name, nzb_folder, issueid=None, module=None, queue=None, comicid=None, apicall=False, ddl=False):
+    def __init__(self, nzb_name, nzb_folder, issueid=None, module=None, queue=None, comicid=None, apicall=False, ddl=False, folder_monitor=False):
         """
         Creates a new post processor with the given file path and optionally an NZB name.
 
@@ -54,6 +54,7 @@ class PostProcessor(object):
         # name of the NZB that resulted in this folder
         self.nzb_name = nzb_name
         self.nzb_folder = nzb_folder
+        self.folder_monitor = folder_monitor
         if module is not None:
             self.module = module + '[POST-PROCESSING]'
         else:
@@ -415,6 +416,110 @@ class PostProcessor(object):
             logger.fdebug('%s[%s] Failed to remove directory - Processing will continue, but manual removal is necessary' % (self.module,e))
             self._log('Failed to remove temporary directory')
 
+
+    def _should_skip_cached(self, full_filename, wv, myDB):
+        """Return (skip: bool, reason: str) for the folder-monitor cache.
+
+        Only called when self.folder_monitor is True and
+        mylar.CONFIG.FOLDER_MONITOR_CACHE is enabled. A cache hit is honoured
+        only when the file is unchanged on disk AND the matching issue's DB
+        status is still the same non-Wanted/Snatched value we observed.
+        Otherwise the cache row is invalidated and the caller falls through
+        to the normal post-processing path.
+        """
+        if not self.folder_monitor or not mylar.CONFIG.FOLDER_MONITOR_CACHE:
+            return False, 'disabled'
+        try:
+            stat = os.stat(full_filename)
+        except OSError:
+            # File gone from disk. Drop any stale cache row; do not skip.
+            myDB.action('DELETE FROM checked_files WHERE file_path=? AND ComicID=?',
+                        [full_filename, wv['ComicID']])
+            return False, 'file-gone'
+
+        row = myDB.selectone(
+            'SELECT observed_status, IssueID, Int_IssueNumber, mtime, size '
+            'FROM checked_files WHERE file_path=? AND ComicID=?',
+            [full_filename, wv['ComicID']]
+        ).fetchone()
+        if row is None or row['Int_IssueNumber'] is None:
+            # No cache row, or the cached row has no issue number to re-check
+            # against (original parse failed) - fall through.
+            return False, 'no-cache'
+
+        if int(row['mtime']) != int(stat.st_mtime) or int(row['size']) != int(stat.st_size):
+            # File changed on disk since last scan - invalidate and fall through.
+            myDB.action('DELETE FROM checked_files WHERE file_path=? AND ComicID=?',
+                        [full_filename, wv['ComicID']])
+            return False, 'file-changed'
+
+        # Fingerprint matches - re-check the issue status only.
+        current = myDB.selectone(
+            'SELECT Status FROM issues WHERE ComicID=? AND Int_IssueNumber=?',
+            [wv['ComicID'], int(row['Int_IssueNumber'])]
+        ).fetchone()
+        if current is None and mylar.CONFIG.ANNUALS_ON:
+            current = myDB.selectone(
+                'SELECT Status FROM annuals WHERE ComicID=? AND Int_IssueNumber=?',
+                [wv['ComicID'], int(row['Int_IssueNumber'])]
+            ).fetchone()
+        if current is None:
+            # Issue can't be located now. If we previously recorded a skip because
+            # there was no issue row either (Paused-Ended), the file is still
+            # un-actionable - skip it. Otherwise be conservative and re-process.
+            if row['observed_status'] == 'Paused-Ended':
+                return True, 'cache-hit-issue-still-missing'
+            myDB.action('DELETE FROM checked_files WHERE file_path=? AND ComicID=?',
+                        [full_filename, wv['ComicID']])
+            return False, 'issue-unlocatable'
+
+        if current[0] == row['observed_status'] and current[0] not in ('Wanted', 'Snatched'):
+            return True, 'cache-hit-status-unchanged'
+
+        # Status changed since cache was written - invalidate and fall through.
+        myDB.action('DELETE FROM checked_files WHERE file_path=? AND ComicID=?',
+                    [full_filename, wv['ComicID']])
+        return False, 'status-changed'
+
+    def _cache_skip(self, full_filename, wv, tmp_iss, observed_status, myDB):
+        """Record that the folder monitor examined this file x series and took
+        no action, so subsequent scans can skip it while the file is unchanged
+        and the issue status stays the same.
+        """
+        if not self.folder_monitor or not mylar.CONFIG.FOLDER_MONITOR_CACHE:
+            return
+        if tmp_iss is None:
+            # Can't identify which issue this file belongs to, so there is
+            # nothing stable to cache a decision against.
+            return
+        try:
+            stat = os.stat(full_filename)
+        except OSError:
+            return
+
+        issueid = None
+        row = myDB.selectone(
+            'SELECT IssueID FROM issues WHERE ComicID=? AND Int_IssueNumber=?',
+            [wv['ComicID'], tmp_iss]
+        ).fetchone()
+        if row is None and mylar.CONFIG.ANNUALS_ON:
+            row = myDB.selectone(
+                'SELECT IssueID FROM annuals WHERE ComicID=? AND Int_IssueNumber=?',
+                [wv['ComicID'], tmp_iss]
+            ).fetchone()
+        if row is not None:
+            issueid = row[0]
+
+        myDB.upsert('checked_files',
+                    valueDict={
+                        'mtime': int(stat.st_mtime),
+                        'size': int(stat.st_size),
+                        'IssueID': issueid,
+                        'Int_IssueNumber': tmp_iss,
+                        'observed_status': observed_status,
+                        'last_checked': helpers.utctimestamp(),
+                    },
+                    keyDict={'file_path': full_filename, 'ComicID': wv['ComicID']})
 
     def Process(self):
             module = self.module
@@ -862,19 +967,27 @@ class PostProcessor(object):
                                 #    continue
                     watchvals = []
                     for wv in comicseries:
-                        logger.info('Now checking: %s [%s]' % (wv['ComicName'], wv['ComicID']))
                         #do some extra checks in here to ignore these types:
                         # check for valid issue number - if not, don't even bother checking it
                         # TODO Not sure why this is here.  If it catches any exception, then it's going to cause problems further down.
+                        tmp_iss = None
                         try:
                             tmp_iss = helpers.issue_number_parser(fl['issue_number']).asInt
                         except Exception as e:
                             logger.warn('Unable to determine issue number. This is a no-go, Captain [%s]' % (e,))
 
+                        if self.folder_monitor and mylar.CONFIG.FOLDER_MONITOR_CACHE:
+                            skip_cached, skip_reason = self._should_skip_cached(full_filename, wv, myDB)
+                            if skip_cached:
+                                logger.fdebug('%s Skipped (folder-monitor cache, %s): %s [%s]' % (module, skip_reason, wv['ComicName'], wv['ComicID']))
+                                continue
+
+                        logger.info('Now checking: %s [%s]' % (wv['ComicName'], wv['ComicID']))
                         #check for Paused status /
                         #check for Ended status and 100% completion of issues.
                         if wv['ComicPublished'] is None:
                             logger.fdebug('Publication Run cannot be generated - probably due to an incomplete Refresh. Manually refresh the following series and try again: %s (%s)' % (wv['ComicName'], wv['ComicYear']))
+                            self._cache_skip(full_filename, wv, tmp_iss, 'ComicPublished_None', myDB)
                             continue
                         if (wv['Status'] == 'Paused' and any(
                                 [
@@ -896,9 +1009,11 @@ class PostProcessor(object):
                                     logger.fdebug('Series is 100%s complete, but specific issue %s matched up to a %s status. Let\'s Go!' % ('%', tmp_iss, dbcheck[0]))
                                 else:
                                     logger.fdebug('Series is 100%s complete, however status is not Wanted (or Snatched), but %s. Set to Wanted for this to post-process on the next run.' % ('%', dbcheck[0]))
+                                    self._cache_skip(full_filename, wv, tmp_iss, dbcheck[0], myDB)
                                     continue
                             else:
                                 logger.warn('%s [%s] is either Paused or in an Ended status with 100%s completion. Ignoring for match.' % (wv['ComicName'], wv['ComicYear'], '%'))
+                                self._cache_skip(full_filename, wv, tmp_iss, 'Paused-Ended', myDB)
                                 continue
                         wv_comicname = wv['ComicName']
                         wv_dynamicname = wv['DynamicComicName']
@@ -3584,7 +3699,7 @@ class FolderCheck():
             helpers.job_management(write=True, job='Folder Monitor', current_run=helpers.utctimestamp(), status='Running')
             mylar.MONITOR_STATUS = 'Running'
             logger.info('%s Checking folder %s for newly snatched downloads' % (self.module, mylar.CONFIG.CHECK_FOLDER))
-            PostProcess = PostProcessor('Manual Run', mylar.CONFIG.CHECK_FOLDER, queue=self.queue)
+            PostProcess = PostProcessor('Manual Run', mylar.CONFIG.CHECK_FOLDER, queue=self.queue, folder_monitor=True)
             result = PostProcess.Process()
             logger.info('%s Finished checking for newly snatched downloads' % self.module)
             helpers.job_management(write=True, job='Folder Monitor', last_run_completed=helpers.utctimestamp(), status='Waiting')
