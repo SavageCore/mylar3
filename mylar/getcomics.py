@@ -185,7 +185,14 @@ class GC(object):
             if mylar.CONFIG.PACK_PRIORITY:
                 #t_sf = self.search_format.pop(len(self.search_format)-1) #pop the last search query ('%s %s')
                 #add it in 1st so that packs will get searched for (hopefully first)
-                self.search_format.insert(0, '%s %s' % (self.query['comicname'], self.query['year']))
+                # use the series year for the name-only pack pass so multi-year packs
+                # (e.g. 'DMZ #1-72 (2006-2015)') match instead of the per-issue year.
+                pack_year = self.query['year']
+                if is_info is not None and is_info.get('cmloopit') == 5:
+                    sy = is_info.get('SeriesYear')
+                    if sy:
+                        pack_year = str(sy)
+                self.search_format.insert(0, '%s %s' % (self.query['comicname'], pack_year))
 
             for sf in self.search_format:
                 verified_matches = []

@@ -779,9 +779,10 @@ def NZB_SEARCH(
             tmpprov = nzbprov
     if cmloopit == 4 or cmloopit == 5:
         issuedisplay = None
+        log_year = SeriesYear if (cmloopit == 5 and SeriesYear) else ComicYear
         logger.info(
             'Shhh be very quiet...I\'m looking for %s (%s) using %s.'
-            % (ComicName, ComicYear, tmpprov)
+            % (ComicName, log_year, tmpprov)
         )
     elif IssueNumber is not None:
         issuedisplay = IssueNumber
