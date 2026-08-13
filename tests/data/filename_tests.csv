@@ -56,3 +56,7 @@ Haunted Horror 029(2017)(Digital)(TLK-EMPIRE-HD).cbr,Haunted Horror,029,2017,Non
 "Excalibur, 2019-11-20 (02) (digital) (Glorith-HD).cbr",Excalibur,02,2019,None,False,
 Weapon Zero T-2.cbz,Weapon Zero,T-2,None,None,True,Prefix string issues not yet supported
 God Is Dead The Book of Acts Alpha.cbz,God Is Dead The Book of Acts,Alpha,None,None,True,Pure string issue not yet covered
+The Boys 11 - Glorious Five Year Plan 1 (2007) (Digital-1920) (Kingpin-Empire).cbr,The Boys,11,2007,None,False,Arc-pack file with part number after the dash
+The Boys 03 - Cherry 1 (2008) (Digital-1920) (Kingpin-Empire).cbr,The Boys,03,2008,None,False,Arc-pack file with leading-zero part number after the dash
+The Boys 57 - Big Ride 2 (2011) (HD) (digital-Empire).cbz,The Boys,57,2011,None,False,Arc-pack file cbz variant
+Peter Parker Spider-Man #156.1 (2012).cbz,Peter Parker Spider-Man,156.1,2012,None,False,Dash in series name with decimal issue must stay intact

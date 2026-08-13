@@ -1000,7 +1000,7 @@ class FileChecker(object):
                         break
                     elif pis['mod_position'] > finddash and finddash != -1:
                         if yearmodposition is not None:
-                            if finddash < yearmodposition and finddash > (yearmodposition + len(split_file[yearposition])):
+                            if finddash < yearmodposition and pis['mod_position'] < yearmodposition and any(pn['mod_position'] < finddash for pn in possible_issuenumbers):
                                 logger.fdebug('issue number is positioned after a dash - probably not an issue number, but part of an issue title')
                                 dash_numbers.append({'mod_position': pis['mod_position'],
                                                      'number':       pis['number'],
